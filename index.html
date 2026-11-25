@@ -861,13 +861,13 @@
           <span class="soul">♥</span>
           <span>全員選ぶまで続けるモード</span>
         </button>
-        <button class="big-btn" data-mode="random">
-          <span class="soul">♥</span>
-          <span>エンドレス・ランダムモード</span>
-        </button>
         <button class="big-btn" data-mode="appear_all">
           <span class="soul">♥</span>
           <span>全員1回は出るまでモード</span>
+        </button>
+        <button class="big-btn" data-mode="random">
+          <span class="soul">♥</span>
+          <span>エンドレスモード</span>
         </button>
       </div>
 
@@ -886,13 +886,13 @@
           <div>* 【全員選ぶまで続けるモード】</div>
           <div class="mode-message-body">全ホロメンを一回ずつ選択するまで続きます。選択されたホロメンは選択肢の候補に現れません。</div>
         </div>
-        <div class="mode-message-option" data-description="random">
-          <div>* 【エンドレス・ランダムモード】</div>
-          <div class="mode-message-body">終わりはありません。</div>
-        </div>
         <div class="mode-message-option" data-description="appear_all">
           <div>* 【全員1回は出るまでモード】</div>
           <div class="mode-message-body">全ホロメンが選択肢に出れば終わります。全員選ぶまでモードとは違い、選択されなくても候補から外されます。</div>
+        </div>
+        <div class="mode-message-option" data-description="random">
+          <div>* 【エンドレスモード】</div>
+          <div class="mode-message-body">終わりはありません。</div>
         </div>
       </div>
     </section>
@@ -1242,7 +1242,7 @@
 
     const MODE_NAMES = {
       select_all: '全員選ぶまで続ける',
-      random: 'エンドレス・ランダム',
+      random: 'エンドレスモード',
       appear_all: '全員1回は出るまで'
     };
 
