@@ -20,7 +20,7 @@ export default { async fetch(request, env, ctx) {
       const key=new Request(url.origin+'/ranking');
       const cached=await caches.default.match(key); if(cached)return cached;
       const {results}=await env.DB.prepare('SELECT topic,member,wins,appearances FROM ranking WHERE wins > 0').all();
-      const response=json({rows:results.map(r=>[r.topic,r.member,r.wins,r.appearances])},200,{'Cache-Control':'public, max-age=300'});
+      const response=json({rows:results.map(r=>[r.topic,r.member,r.wins,r.appearances])},200,{'Cache-Control':'public, max-age=60'});
       ctx.waitUntil(caches.default.put(key,response.clone()).catch(()=>{})); return response;
     }
     if(request.method!=='POST'||url.pathname!=='/votes') return json({error:'not found'},404);
@@ -40,6 +40,7 @@ export default { async fetch(request, env, ctx) {
     await env.DB.prepare('INSERT OR IGNORE INTO batches (id,digest,votes) VALUES (?,?,?)').bind(body.id,digest,votes).run();
     const receipt=await env.DB.prepare('SELECT digest FROM batches WHERE id=?').bind(body.id).first();
     if(!receipt||receipt.digest!==digest)return json({error:'batch ID collision'},409);
+    ctx.waitUntil(caches.default.delete(new Request(url.origin+'/ranking')).catch(()=>{}));
     return json({ok:true,id:body.id});
   } catch(err) { console.error('request failed',err.message); return json({error:'temporarily unavailable'},503); }
 }};
