@@ -6,7 +6,7 @@ workers_dev = true
 [[d1_databases]]
 binding = "DB"
 database_name = "holo-choice"
-database_id = "REPLACE_WITH_DATABASE_ID"
+database_id = "8e58ff05-118d-4b72-8573-c3337697f5c0"
 
 [[ratelimits]]
 name = "VOTE_LIMIT"
