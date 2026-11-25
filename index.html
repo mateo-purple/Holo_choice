@@ -355,6 +355,21 @@
       }
     }
 
+    .arena.single-choice {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: center;
+    }
+
+    .arena.single-choice #card-left {
+      width: 100%;
+      max-width: 470px;
+    }
+
+    .arena.single-choice #card-right,
+    .arena.single-choice .vs-badge {
+      display: none;
+    }
+
     .slot-card {
       border: 4px solid #fff;
       background: #000;
@@ -1388,6 +1403,10 @@
         priority = pool.filter(m => !gameState.seenIds.has(m.id));
       }
 
+      if (gameState.mode !== 'random' && priority.length === 1) {
+        return [priority[0], null];
+      }
+
       const pickRandom = arr => arr[Math.floor(Math.random() * arr.length)];
 
       let left = priority.length > 0 ? pickRandom(priority) : pickRandom(pool);
@@ -1428,15 +1447,15 @@
 
       document.getElementById('topic-display').textContent = gameState.currentTopic.text;
       renderSlotMember('left', gameState.leftMember);
-      renderSlotMember('right', gameState.rightMember);
+      if (gameState.rightMember) renderSlotMember('right', gameState.rightMember);
 
       const leftCard = document.getElementById('card-left');
       const rightCard = document.getElementById('card-right');
       leftCard.className = 'slot-card ready';
       rightCard.className = 'slot-card ready';
 
-      document.getElementById('tag-left').textContent = '▶ こっちを選ぶ [←]';
-      document.getElementById('tag-right').textContent = '▶ こっちを選ぶ [→]';
+      document.getElementById('tag-left').textContent = gameState.rightMember ? '▶ こっちを選ぶ [←]' : '▶ 選ぶ [Enter / Space]';
+      document.getElementById('tag-right').textContent = gameState.rightMember ? '▶ こっちを選ぶ [→]' : '';
 
       gameState.phase = 'choosing';
       gameState.pendingSide = null;
@@ -1464,6 +1483,11 @@
       gameState.currentTopic = targetTopic;
       gameState.leftMember = targetLeft;
       gameState.rightMember = targetRight;
+      document.getElementById('arena').classList.toggle('single-choice', !targetRight);
+      if (!targetRight) {
+        finalizeSpin();
+        return;
+      }
 
       document.getElementById('skip-hint').textContent = '▶ 画面クリックまたは Space / Enter でスロット即停止';
 
@@ -1510,6 +1534,7 @@
 
     function selectPendingSide(side) {
       if (gameState.phase !== 'choosing' && gameState.phase !== 'confirming') return;
+      if (!gameState.rightMember && side !== 'left') return;
       gameState.phase = 'confirming';
       gameState.pendingSide = side;
 
@@ -1540,9 +1565,10 @@
 
       gameState.roundCount++;
       gameState.seenIds.add(gameState.leftMember.id);
-      gameState.seenIds.add(gameState.rightMember.id);
+      if (gameState.rightMember) gameState.seenIds.add(gameState.rightMember.id);
       gameState.selectedIds.add(winner.id);
 
+      if (loser) {
       const record = {
         timestamp: new Date().toISOString(),
         mode: gameState.mode,
@@ -1558,6 +1584,9 @@
       records.push(record);
       saveRecords();
       queueVote(record);
+      }
+      gameState.phase = 'idle';
+      gameState.pendingSide = null;
       updateHud();
 
       const totalPool = gameState.pool.length;
@@ -1651,7 +1680,10 @@
         e.preventDefault();
         finalizeSpin();
       } else if (gameState.phase === 'choosing' || gameState.phase === 'confirming') {
-        if (e.code === 'ArrowLeft') {
+        if (!gameState.rightMember && gameState.phase === 'choosing' && (e.code === 'Enter' || e.code === 'Space')) {
+          e.preventDefault();
+          selectPendingSide('left');
+        } else if (e.code === 'ArrowLeft') {
           e.preventDefault();
           selectPendingSide('left');
         } else if (e.code === 'ArrowRight') {
