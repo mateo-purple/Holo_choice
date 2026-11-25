@@ -758,6 +758,46 @@
       gap: 10px;
     }
 
+    /* GAME HISTORY */
+    .history-list {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-row {
+      border: 2px solid #fff;
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 100px;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .history-topic {
+      overflow-wrap: anywhere;
+      font-size: 1.1rem;
+    }
+
+    .history-member {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+      font-size: 0.85rem;
+      overflow-wrap: anywhere;
+    }
+
+    .history-member img {
+      width: 82px;
+      height: 82px;
+      object-fit: cover;
+      object-position: top center;
+      border: 1px solid #666;
+    }
+
     /* MODALS (REMAINING MEMBERS, CLEAR, TITLE CONFIRM) */
     .modal-overlay {
       display: none;
@@ -996,6 +1036,10 @@
         </div>
       </div>
     </section>
+    <section id="screen-history" class="screen">
+      <h2>履歴</h2>
+      <div class="history-list" id="game-history-list"></div>
+    </section>
   </main>
 
   <!-- REMAINING MEMBERS MODAL (NON-ENDLESS MODES) -->
@@ -1027,11 +1071,11 @@
   <!-- MODE CLEAR MODAL -->
   <div class="modal-overlay" id="clear-overlay">
     <div class="ut-box modal-box">
-      <h2 style="color:var(--accent); margin-top:0;">CLEAR!</h2>
+      <h2 style="color:var(--accent); margin-top:0;">終了！</h2>
       <p id="clear-message" style="line-height:1.7; font-size:1.15rem;"></p>
       <div style="display:flex; gap:12px; justify-content:center; margin-top:18px; flex-wrap:wrap;">
-        <button class="nav-btn" id="btn-clear-stats">統計画面を見る</button>
-        <button class="nav-btn" id="btn-clear-title">タイトルへ戻る</button>
+        <button class="nav-btn" id="btn-clear-history">履歴を見る</button>
+        <button class="nav-btn" id="btn-clear-stats">みんなの選択を見る</button>
       </div>
     </div>
   </div>
@@ -1337,7 +1381,10 @@
       gameState.intervals = [];
     }
 
+    let gameHistory = [];
+
     function startGame(mode) {
+      gameHistory = [];
       const pool = getActivePool();
       hasActiveGame = true;
       gameState = {
@@ -1567,6 +1614,7 @@
       gameState.seenIds.add(gameState.leftMember.id);
       if (gameState.rightMember) gameState.seenIds.add(gameState.rightMember.id);
       gameState.selectedIds.add(winner.id);
+      gameHistory.push({ topic: gameState.currentTopic.text, member: winner });
 
       if (loser) {
       const record = {
@@ -1593,13 +1641,13 @@
       if (gameState.mode === 'select_all' && gameState.selectedIds.size >= totalPool) {
         hasActiveGame = false;
         updateResumeButtons();
-        showClearModal(`対象ホロメン全 ${totalPool} 人の選択を達成しました！（総ラウンド数: ${gameState.roundCount}）`);
+        showClearModal('ホロメン全員を選択しました！');
         return;
       }
       if (gameState.mode === 'appear_all' && gameState.seenIds.size >= totalPool) {
         hasActiveGame = false;
         updateResumeButtons();
-        showClearModal(`対象ホロメン全 ${totalPool} 人の登場を達成しました！（総ラウンド数: ${gameState.roundCount}）`);
+        showClearModal('ホロメン全員が登場しました！');
         return;
       }
 
@@ -1709,9 +1757,37 @@
       void refreshRanking();
     });
 
-    document.getElementById('btn-clear-title').addEventListener('click', () => {
+    function renderGameHistory() {
+      const list = document.getElementById('game-history-list');
+      list.replaceChildren();
+      for (const entry of gameHistory) {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+        const topic = document.createElement('div');
+        topic.className = 'history-topic';
+        topic.textContent = entry.topic;
+        const member = document.createElement('div');
+        member.className = 'history-member';
+        if (entry.member.image) {
+          const img = document.createElement('img');
+          img.src = entry.member.image;
+          img.alt = entry.member.name;
+          img.onerror = () => img.remove();
+          member.appendChild(img);
+        }
+        const name = document.createElement('div');
+        name.textContent = entry.member.name;
+        member.appendChild(name);
+        row.append(topic, member);
+        list.appendChild(row);
+      }
+    }
+
+    document.getElementById('btn-clear-history').addEventListener('click', () => {
       document.getElementById('clear-overlay').classList.remove('active');
-      showScreen('screen-title');
+      renderGameHistory();
+      showScreen('screen-history');
+      window.scrollTo(0, 0);
     });
 
     // === STATISTICS ENGINE ===
