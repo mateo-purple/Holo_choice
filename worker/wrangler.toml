@@ -1,0 +1,14 @@
+name = "holo-choice-ranking"
+main = "index.js"
+compatibility_date = "2026-11-25"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "holo-choice"
+database_id = "REPLACE_WITH_DATABASE_ID"
+
+[[ratelimits]]
+name = "VOTE_LIMIT"
+namespace_id = "174095"
+simple = { limit = 6, period = 60 }
