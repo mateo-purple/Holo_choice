@@ -1482,7 +1482,7 @@
         lastFetched = 0;
         if (document.getElementById('screen-stats').classList.contains('active')) void refreshRanking(true);
       } catch (err) {
-        onlineStatus('未送信の投票を端末に保存中。自動で再送します。');
+        onlineStatus('');
         console.warn('投票送信:', err);
         scheduleVoteRetry();
       } finally { sending = false; }
