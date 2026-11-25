@@ -1,0 +1,1 @@
+window.HOLO_EXTRA_CHARACTERS = [];
