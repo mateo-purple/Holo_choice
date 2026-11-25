@@ -191,6 +191,32 @@
       padding: 6px 12px;
     }
 
+    /* TITLE MODE DESCRIPTION */
+    main:has(#screen-title.active) {
+      position: relative;
+      padding-bottom: 144px;
+    }
+
+    .mode-message {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      min-height: 108px;
+      padding: 16px 20px;
+      font-size: clamp(1rem, 2.5vw, 1.2rem);
+      line-height: 1.6;
+    }
+
+    @media (max-width: 720px) {
+      main:has(#screen-title.active) {
+        padding-bottom: 180px;
+      }
+      .mode-message {
+        min-height: 144px;
+      }
+    }
+
     /* GAME SCREEN */
     main:has(#screen-game.active) {
       position: relative;
@@ -802,6 +828,7 @@
           <option value="jp_devis">JP ＋ DEV_IS</option>
         </select>
       </div>
+      <div class="ut-box mode-message" id="mode-message" aria-live="polite">* モードを選んでください。</div>
     </section>
 
     <!-- SCREEN 2: GAME -->
@@ -1215,6 +1242,21 @@
       showScreen('screen-stats');
       void refreshRanking();
       activateStatsTab('tab-by-topic');
+    });
+
+    const modeMessages = {
+      select_all: '* 全員を一度は選ぶまで続きます。まだ選んでいないホロメンを選びましょう。',
+      random: '* 終わりのないランダムモードです。好きなだけ二択を楽しめます。',
+      appear_all: '* 対象のホロメン全員が一度は登場するとクリアです。'
+    };
+    const modeMessage = document.getElementById('mode-message');
+    const resetModeMessage = () => { modeMessage.textContent = '* モードを選んでください。'; };
+    document.querySelectorAll('.big-btn[data-mode]').forEach(btn => {
+      const show = () => { modeMessage.textContent = modeMessages[btn.dataset.mode]; };
+      btn.addEventListener('mouseenter', show);
+      btn.addEventListener('mouseleave', resetModeMessage);
+      btn.addEventListener('focus', show);
+      btn.addEventListener('blur', resetModeMessage);
     });
 
     document.querySelectorAll('.big-btn').forEach(btn => {
