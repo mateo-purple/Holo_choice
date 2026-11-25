@@ -1035,6 +1035,51 @@
       #screen-title .logo-area { margin-bottom: 6px; }
     }
 
+    /* Group selection */
+    .pool-filter { position: relative; color: var(--fg); }
+    .pool-filter summary {
+      border: 2px solid #fff;
+      background: #000;
+      padding: 6px 12px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .pool-options {
+      position: absolute;
+      z-index: 20;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(560px, calc(100vw - 32px));
+      max-height: min(55vh, 360px);
+      max-height: min(55dvh, 360px);
+      overflow: auto;
+      overscroll-behavior: contain;
+      background: #000;
+      border: 2px solid #fff;
+      padding: 10px;
+    }
+    #pool-group-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+    }
+    .pool-options label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 3px;
+      cursor: pointer;
+      overflow-wrap: anywhere;
+    }
+    .pool-options input { accent-color: #fff; flex-shrink: 0; width: 17px; height: 17px; }
+    .pool-all { border-bottom: 1px solid #666; margin-bottom: 6px; }
+    .big-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    @media (max-width: 720px) {
+      .pool-filter summary { padding: 5px 8px; }
+      .pool-options { font-size: .8rem; }
+      .pool-options label { min-height: 32px; }
+    }
   </style>
 </head>
 <body>
@@ -1072,12 +1117,13 @@
       </div>
 
       <div class="filter-bar">
-        <label for="pool-filter">対象メンバー範囲:</label>
-        <select id="pool-filter">
-          <option value="all">全員 (全95枠)</option>
-          <option value="active">現役メンバーのみ</option>
-          <option value="jp_devis">JP ＋ DEV_IS</option>
-        </select>
+        <details id="pool-filter" class="pool-filter">
+          <summary id="pool-filter-summary">対象メンバー</summary>
+          <div class="pool-options">
+            <label class="pool-all"><input type="checkbox" id="pool-all" checked> 全員</label>
+            <div id="pool-group-list"></div>
+          </div>
+        </details>
       </div>
       </div>
       <div class="ut-box mode-message" id="mode-message">
@@ -1118,7 +1164,6 @@
       <div class="arena" id="arena">
         <div class="slot-card spinning" id="card-left" data-side="left">
           <div class="portrait-wrap" id="img-wrap-left"></div>
-          <div class="member-group" id="group-left">---</div>
           <div class="member-name" id="name-left">？？？</div>
           <div class="choose-tag" id="tag-left"></div>
         </div>
@@ -1127,7 +1172,6 @@
 
         <div class="slot-card spinning" id="card-right" data-side="right">
           <div class="portrait-wrap" id="img-wrap-right"></div>
-          <div class="member-group" id="group-right">---</div>
           <div class="member-name" id="name-right">？？？</div>
           <div class="choose-tag" id="tag-right"></div>
         </div>
@@ -1464,14 +1508,40 @@
     }
 
     function getActivePool() {
-      const filter = document.getElementById('pool-filter').value;
-      if (filter === 'active') {
-        return members.filter(m => m.group !== '卒業生' && m.group !== '配信活動終了');
+      const selected = new Set(Array.from(document.querySelectorAll('#pool-group-list input:checked'), box => box.value));
+      return members.filter(m => selected.has(m.group));
+    }
+
+    function initPoolFilter() {
+      const filter = document.getElementById('pool-filter');
+      const list = document.getElementById('pool-group-list');
+      const all = document.getElementById('pool-all');
+      for (const group of new Set(members.map(m => m.group))) {
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = group;
+        checkbox.checked = true;
+        label.append(checkbox, document.createTextNode(group));
+        list.appendChild(label);
       }
-      if (filter === 'jp_devis') {
-        return members.filter(m => m.group.startsWith('JP /') || m.group.startsWith('DEV_IS /'));
-      }
-      return members;
+      const boxes = Array.from(list.querySelectorAll('input'));
+      const update = () => {
+        const count = getActivePool().length;
+        all.checked = boxes.every(b => b.checked);
+        all.indeterminate = !all.checked && boxes.some(b => b.checked);
+        document.getElementById('pool-filter-summary').textContent = '対象メンバー：' + count + '人';
+        document.querySelectorAll('.big-btn[data-mode]').forEach(btn => {
+          btn.disabled = count < (btn.dataset.mode === 'random' ? 2 : 1);
+        });
+      };
+      all.addEventListener('change', () => {
+        boxes.forEach(b => { b.checked = all.checked; });
+        update();
+      });
+      list.addEventListener('change', update);
+      document.addEventListener('click', e => { if (!filter.contains(e.target)) filter.open = false; });
+      update();
     }
 
     const MODE_NAMES = {
@@ -1668,10 +1738,8 @@
 
     function renderSlotMember(side, member) {
       const wrap = document.getElementById(`img-wrap-${side}`);
-      const groupEl = document.getElementById(`group-${side}`);
       const nameEl = document.getElementById(`name-${side}`);
 
-      groupEl.textContent = member.group;
       nameEl.textContent = member.name;
 
       wrap.innerHTML = '';
@@ -1798,7 +1866,7 @@
       const summaryEl = document.getElementById('confirm-summary');
       summaryEl.innerHTML = `
         お題：<span class="hl-topic">「${gameState.currentTopic.text}」</span><br>
-        選択中：<span class="hl-member">${chosenMember.name}</span> <span style="color:var(--sub);font-size:0.95rem;">(${chosenMember.group})</span>
+        選択中：<span class="hl-member">${chosenMember.name}</span>
       `;
       document.getElementById('confirm-banner').classList.add('visible');
     }
@@ -1890,7 +1958,6 @@
           <div class="remaining-card">
             ${makeImgTag(m, '')}
             <div class="r-name">${m.name}</div>
-            <div class="r-group">${m.group}</div>
           </div>
         `).join('');
       }
@@ -2081,7 +2148,6 @@
           ${makeImgTag(item.member, 'rank-photo')}
           <div style="flex:1;">
             <div style="font-size:1.15rem; color:var(--fg);">${item.member.name}</div>
-            <div style="font-size:0.85rem; color:var(--sub); margin-top:2px;">${item.member.group}</div>
             <div style="font-size:0.95rem; color:var(--ok); margin-top:4px;">選ばれた回数：${item.cnt}回</div>
           </div>
         </div>
@@ -2131,7 +2197,6 @@
           ${makeImgTag(m, 'member-header-photo')}
           <div>
             <div style="font-size:1.25rem; color:var(--accent);">${m.name}</div>
-            <div style="font-size:0.9rem; color:var(--sub); margin-top:4px;">${m.group}</div>
             <div style="font-size:0.95rem; color:var(--ok); margin-top:4px;">合計選出回数：${m.totalWins}回</div>
           </div>
         </div>
@@ -2229,6 +2294,7 @@
     });
 
     // Init
+    initPoolFilter();
     updateHudTotal();
     if (onlineEnabled) {
       onlineStatus('全ユーザー共通ランキング（数分遅れて反映）');
