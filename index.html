@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HOLO-CHOICE</title>
+  <title>究極のホロ二択</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
 
@@ -192,12 +192,27 @@
     }
 
     /* GAME SCREEN */
+    main:has(#screen-game.active) {
+      position: relative;
+      padding-bottom: 64px;
+    }
+
+    @media (max-width: 720px) {
+      main:has(#screen-game.active) {
+        padding-bottom: 100px;
+      }
+    }
+
     .hud-bar {
-      width: 100%;
+      position: absolute;
+      bottom: 12px;
+      left: 16px;
+      right: 16px;
+      width: auto;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 14px;
+      margin-bottom: 0;
       font-size: 1rem;
       color: var(--sub);
       flex-wrap: wrap;
@@ -749,7 +764,7 @@
 <body>
 
   <header>
-    <div class="header-title" id="btn-home">* HOLO-CHOICE</div>
+    <div class="header-title" id="btn-home">* 究極のホロ二択</div>
     <div class="header-nav">
       <button class="nav-btn resume-btn" id="nav-resume">ゲームに戻る ▶</button>
       <button class="nav-btn active" id="nav-title">TITLE</button>
@@ -761,7 +776,7 @@
     <!-- SCREEN 1: TITLE -->
     <section id="screen-title" class="screen active">
       <div class="logo-area">
-        <h1>HOLO-CHOICE</h1>
+        <h1>究極のホロ二択</h1>
       </div>
 
       <div class="mode-buttons">
