@@ -1160,6 +1160,20 @@
     function onlineStatus(message) {
       document.getElementById('online-status').textContent = message;
     }
+    let retryTimer = null, retryDelay = 60000;
+    function hasPendingVotes() {
+      try { return Object.keys(localStorage).some(k => k.startsWith(QUEUE_PREFIX) || k.startsWith(VOTE_PREFIX)); }
+      catch { return false; }
+    }
+    function scheduleVoteRetry() {
+      if (retryTimer !== null || !hasPendingVotes()) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (document.visibilityState === 'visible' && navigator.onLine !== false) void flushVotes();
+        else scheduleVoteRetry();
+      }, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 300000);
+    }
     function queueVote(record) {
       if (!onlineEnabled) return;
       try {
@@ -1229,11 +1243,13 @@
       });
     }
     async function flushVotes() {
-      if (!onlineEnabled) return;
+      if (!onlineEnabled || !hasPendingVotes()) return;
+      if (navigator.onLine === false) { scheduleVoteRetry(); return; }
       // Freeze current batch synchronously before any network request.
       voteCount = 0;
       if (sending) { sendAgain = true; return; }
       sending = true;
+      if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
       try {
         do {
           sendAgain = false;
@@ -1244,7 +1260,10 @@
             for (const batch of batches) {
               const token = await challenge();
               const res = await fetch(apiBase + '/votes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id:batch.id, votes:batch.votes, token}), signal: AbortSignal.timeout(20000) });
-              if (!res.ok) throw new Error('HTTP ' + res.status);
+              if (!res.ok) {
+                const detail = await res.json().catch(() => ({}));
+                throw new Error('HTTP ' + res.status + (detail.error ? ': ' + detail.error : ''));
+              }
               const ack = await res.json();
               if (ack.id !== batch.id || ack.ok !== true) throw new Error('invalid acknowledgement');
               localStorage.removeItem(QUEUE_PREFIX + batch.id);
@@ -1252,9 +1271,14 @@
           };
           if (navigator.locks) await navigator.locks.request('holo-choice-online-send', run); else await run();
         } while (sendAgain);
-        onlineStatus('全ユーザー共通ランキング（数分遅れて反映）');
+        retryDelay = 60000;
+        onlineStatus('全ユーザー共通ランキング（反映まで時間がかかる場合があります）');
+        lastFetched = 0;
+        if (document.getElementById('screen-stats').classList.contains('active')) void refreshRanking(true);
       } catch (err) {
-        onlineStatus('未送信の投票を端末に保存中。次回再送します。'); console.warn(err);
+        onlineStatus('未送信の投票を端末に保存中。自動で再送します。');
+        console.warn('投票送信:', err);
+        scheduleVoteRetry();
       } finally { sending = false; }
     }
     function applyRanking(rows) {
@@ -1263,11 +1287,11 @@
       const topicIds = new Set(topics.map(t => t.id));
       globalRows = rows.filter(r => Array.isArray(r) && topicIds.has(r[0]) && memberIds.has(r[1]) && Number.isSafeInteger(r[2]) && r[2] >= 0);
     }
-    async function refreshRanking() {
-      if (!onlineEnabled || refreshing || Date.now() - lastFetched < 300000) return refreshing;
+    async function refreshRanking(force = false) {
+      if (!onlineEnabled || refreshing || (!force && Date.now() - lastFetched < 60000)) return refreshing;
       refreshing = (async () => {
         try {
-          const res = await fetch(apiBase + '/ranking', {signal: AbortSignal.timeout(15000)});
+          const res = await fetch(apiBase + '/ranking', {cache: 'no-store', signal: AbortSignal.timeout(15000)});
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json(); applyRanking(data.rows);
           lastFetched = Date.now();
@@ -1362,7 +1386,8 @@
       }
       renderAllStats();
       showScreen('screen-stats');
-      void refreshRanking();
+      void flushVotes();
+      void refreshRanking(true);
       activateStatsTab('tab-by-topic');
     });
 
@@ -1780,7 +1805,8 @@
       document.getElementById('clear-overlay').classList.remove('active');
       renderAllStats();
       showScreen('screen-stats');
-      void refreshRanking();
+      void flushVotes();
+      void refreshRanking(true);
     });
 
     function renderGameHistory() {
@@ -2048,7 +2074,16 @@
       onlineStatus('全ユーザー共通ランキング（数分遅れて反映）');
       try { const cache = JSON.parse(localStorage.getItem(CACHE_KEY)); if (cache) { applyRanking(cache.rows); lastFetched = cache.at || 0; } } catch {}
       try { if (Object.keys(localStorage).some(k => k.startsWith(QUEUE_PREFIX) || k.startsWith(VOTE_PREFIX))) void flushVotes(); } catch (err) { console.warn(err); }
-      window.addEventListener('online', () => { void flushVotes(); void refreshRanking(); });
+      window.addEventListener('online', () => { void flushVotes(); void refreshRanking(true); });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          if (hasPendingVotes()) void flushVotes();
+          if (document.getElementById('screen-stats').classList.contains('active')) void refreshRanking(true);
+        }
+      });
+      setInterval(() => {
+        if (document.visibilityState === 'visible' && document.getElementById('screen-stats').classList.contains('active')) void refreshRanking(true);
+      }, 60000);
     } else onlineStatus('端末内のランキング（オンライン未設定）');
   </script>
 </body>
