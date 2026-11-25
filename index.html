@@ -192,28 +192,63 @@
     }
 
     /* TITLE MODE DESCRIPTION */
-    main:has(#screen-title.active) {
-      position: relative;
-      padding-bottom: 144px;
+    #screen-title.active {
+      flex: 1;
+      justify-content: space-between;
+    }
+
+    .title-content {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
     .mode-message {
-      position: absolute;
-      bottom: 16px;
-      left: 16px;
-      right: 16px;
-      min-height: 108px;
+      width: 100%;
+      flex-shrink: 0;
+      margin-top: clamp(24px, 5vh, 64px);
+      min-height: 140px;
       padding: 16px 20px;
-      font-size: clamp(1rem, 2.5vw, 1.2rem);
-      line-height: 1.6;
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      line-height: 1.65;
+      overflow-wrap: anywhere;
+    }
+
+    .mode-message-option {
+      display: none;
+    }
+
+    .mode-message-body {
+      padding-left: 1.25em;
+    }
+
+    #screen-title:has(.big-btn:hover, .big-btn:focus-visible) .mode-message-default {
+      display: none;
+    }
+
+    #screen-title:has(.big-btn[data-mode="select_all"]:hover) .mode-message-option[data-description="select_all"],
+    #screen-title:not(:has(.big-btn:hover)):has(.big-btn[data-mode="select_all"]:focus-visible) .mode-message-option[data-description="select_all"] {
+      display: block;
+    }
+
+    #screen-title:has(.big-btn[data-mode="random"]:hover) .mode-message-option[data-description="random"],
+    #screen-title:not(:has(.big-btn:hover)):has(.big-btn[data-mode="random"]:focus-visible) .mode-message-option[data-description="random"] {
+      display: block;
+    }
+
+    #screen-title:has(.big-btn[data-mode="appear_all"]:hover) .mode-message-option[data-description="appear_all"],
+    #screen-title:not(:has(.big-btn:hover)):has(.big-btn[data-mode="appear_all"]:focus-visible) .mode-message-option[data-description="appear_all"] {
+      display: block;
     }
 
     @media (max-width: 720px) {
-      main:has(#screen-title.active) {
-        padding-bottom: 180px;
-      }
       .mode-message {
         min-height: 144px;
+        padding: 12px 14px;
+        margin-top: 24px;
       }
     }
 
@@ -801,6 +836,7 @@
   <main>
     <!-- SCREEN 1: TITLE -->
     <section id="screen-title" class="screen active">
+      <div class="title-content">
       <div class="logo-area">
         <h1>究極のホロ二択</h1>
       </div>
@@ -828,7 +864,22 @@
           <option value="jp_devis">JP ＋ DEV_IS</option>
         </select>
       </div>
-      <div class="ut-box mode-message" id="mode-message" aria-live="polite">* モードを選んでください。</div>
+      </div>
+      <div class="ut-box mode-message" id="mode-message">
+        <div class="mode-message-default">* モードを選んでください。</div>
+        <div class="mode-message-option" data-description="select_all">
+          <div>* 【全員選ぶまで続けるモード】</div>
+          <div class="mode-message-body">お題に合わせて二択を繰り返し、対象のホロメン全員を一度は選ぶとクリア。まだ選んでいないメンバーが優先して登場します。</div>
+        </div>
+        <div class="mode-message-option" data-description="random">
+          <div>* 【エンドレス・ランダムモード】</div>
+          <div class="mode-message-body">お題と左右のホロメンがランダムに登場します。クリア条件はなく、好きなだけ二択を楽しめます。</div>
+        </div>
+        <div class="mode-message-option" data-description="appear_all">
+          <div>* 【全員1回は出るまでモード】</div>
+          <div class="mode-message-body">対象のホロメン全員が一度は登場するとクリア。どちらを選んでも進み、まだ登場していないメンバーが優先されます。</div>
+        </div>
+      </div>
     </section>
 
     <!-- SCREEN 2: GAME -->
@@ -1242,21 +1293,6 @@
       showScreen('screen-stats');
       void refreshRanking();
       activateStatsTab('tab-by-topic');
-    });
-
-    const modeMessages = {
-      select_all: '* 全員を一度は選ぶまで続きます。まだ選んでいないホロメンを選びましょう。',
-      random: '* 終わりのないランダムモードです。好きなだけ二択を楽しめます。',
-      appear_all: '* 対象のホロメン全員が一度は登場するとクリアです。'
-    };
-    const modeMessage = document.getElementById('mode-message');
-    const resetModeMessage = () => { modeMessage.textContent = '* モードを選んでください。'; };
-    document.querySelectorAll('.big-btn[data-mode]').forEach(btn => {
-      const show = () => { modeMessage.textContent = modeMessages[btn.dataset.mode]; };
-      btn.addEventListener('mouseenter', show);
-      btn.addEventListener('mouseleave', resetModeMessage);
-      btn.addEventListener('focus', show);
-      btn.addEventListener('blur', resetModeMessage);
     });
 
     document.querySelectorAll('.big-btn').forEach(btn => {
