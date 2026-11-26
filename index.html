@@ -1080,6 +1080,26 @@
       .pool-options { font-size: .8rem; }
       .pool-options label { min-height: 32px; }
     }
+
+    /* Unofficial fan game notice (title only) */
+    .fan-notice {
+      align-self: flex-end;
+      max-width: 100%;
+      margin-top: 8px;
+      color: var(--sub);
+      font-size: .72rem;
+      line-height: 1.5;
+      text-align: right;
+      overflow-wrap: anywhere;
+      user-select: text;
+    }
+    .fan-notice a, .fan-notice summary { color: inherit; text-decoration: underline; cursor: pointer; }
+    .fan-notice details { margin-top: 2px; }
+    .fan-notice details[open] { max-width: 650px; text-align: left; }
+    .fan-notice details p { margin: 5px 0; }
+    @media (max-width: 720px) {
+      .fan-notice { font-size: .63rem; margin-top: 4px; line-height: 1.35; }
+    }
   </style>
 </head>
 <body>
@@ -1141,6 +1161,16 @@
           <div class="mode-message-body">終わりはありません。</div>
         </div>
       </div>
+      <aside class="fan-notice" aria-label="非公式ファンゲームについて">
+        <div>非公式・非営利のファンゲームです。カバー株式会社・ホロライブプロダクションとは関係ありません。</div>
+        <div><a href="https://hololivepro.com/terms/" target="_blank" rel="noopener noreferrer">二次創作ガイドライン</a></div>
+        <details>
+          <summary>免責事項・プライバシー</summary>
+          <p>キャラクター・画像等の権利は各権利者に帰属します。ランキングは利用者の選択を集計したものであり、タレントの優劣を示すものではありません。権利者からの申し出には速やかに対応いたします。</p>
+          <p>選択履歴等は端末のブラウザに保存されます。オンラインランキングでは投票データが送信され、不正投票防止のためCloudflare TurnstileおよびIPアドレスによるアクセス制限を利用します。共有URLには選択履歴が含まれ、URLを知っている人が閲覧できます。</p>
+          <p><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Cloudflareプライバシーポリシー</a></p>
+        </details>
+      </aside>
     </section>
 
     <!-- SCREEN 2: GAME -->
