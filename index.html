@@ -2045,20 +2045,73 @@
 
     // The fragment contains only public topic/member IDs, never local votes or images.
     const SHARE_BASE = 'https://mateo-purple.github.io/Holo_choice/';
+    // Frozen v2 dictionary: never reorder or remove these IDs. Unknown future IDs
+    // are carried once in the URL itself, so shared links survive roster changes.
+    const SHARE_MEMBER_IDS_V2 = Object.freeze(["sora","roboco","azki","miko","suisei","aki","haato","fubuki","matsuri","ayame","choco","subaru","mio","okayu","korone","pekora","flare","noel","marine","watame","towa","luna","lamy","nene","botan","polka","laplus","lui","koyori","iroha","risu","moona","iofi","ollie","anya","reine","zeta","kaela","kobo","calliope","kiara","ina","irys","kronii","baelz","shiori","bijou","nerissa","fuwawa","mococo","elizabeth","gigi","cecilia","raora","kanade","ririka","raden","hajime","riona","niko","su","chihaya","vivi","mela","sopia","tsuzuri","kyoko","michiru","sayaka","yuki","chloe","amelia","aqua","shion","kanata","coco","gura","sana","fauna","mumei","ao","mikodanye","cometchan","bukkymouse","kurokami","mukirose","subarudoduck","okanyan","kedamakorone","pekoramama","marine78","kumarin","noeldx","kawausosensei","danchomu","inugami_gorone","shirakami_pineapple","amanyo","chichiro_botan","white_burinyan","makora"]);
+    function historyRows(entries) {
+      return entries.map(e => [e.topicId || topics.find(t => t.text === e.topic)?.id, e.member.id, e.opponent?.id || '']);
+    }
+    function encodeHistoryRows(rows) {
+      const legacy = () => 'v1:' + encodeURIComponent(rows.map(row => row.join('.')).join('~'));
+      const dictionary = [...SHARE_MEMBER_IDS_V2];
+      const extra = [];
+      const index = new Map(dictionary.map((id, i) => [id, i + 1]));
+      const code = id => {
+        if (!id) return 0;
+        if (!index.has(id)) {
+          if (!/^[A-Za-z0-9_-]+$/.test(id) || dictionary.length >= 255) return -1;
+          dictionary.push(id);
+          extra.push(id);
+          index.set(id, dictionary.length);
+        }
+        return index.get(id);
+      };
+      const bytes = new Uint8Array(rows.length * 3);
+      for (let i = 0; i < rows.length; i++) {
+        const [tid, winner, loser] = rows[i];
+        const topic = Number(String(tid).slice(2));
+        const w = code(winner), l = code(loser);
+        if (!/^t_\d{4}$/.test(tid) || topic < 1 || topic > 255 || w < 1 || l < 0) return legacy();
+        bytes.set([topic, w, l], i * 3);
+      }
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      const compact = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const payload = 'v2:' + compact + (extra.length ? '.' + extra.join('.') : '');
+      const old = legacy();
+      return payload.length < old.length ? payload : old;
+    }
     function historyShareURL(entries) {
-      const payload = entries.map(e => [e.topicId || topics.find(t => t.text === e.topic)?.id, e.member.id, e.opponent?.id || ''].join('.')).join('~');
-      return SHARE_BASE + '#history=v1:' + encodeURIComponent(payload);
+      return SHARE_BASE + '#history=' + encodeHistoryRows(historyRows(entries));
+    }
+    function decodeHistoryRows(raw) {
+      if (raw.length > 1000000) throw new Error('invalid history');
+      if (raw.startsWith('v1:')) return raw.slice(3).split('~').map(row => row.split('.'));
+      if (!raw.startsWith('v2:')) throw new Error('invalid history version');
+      const [encoded, ...extra] = raw.slice(3).split('.');
+      const dictionary = [...SHARE_MEMBER_IDS_V2, ...extra];
+      if (!encoded || !/^[A-Za-z0-9_-]+$/.test(encoded) || encoded.length % 4 ||
+          dictionary.length > 255 || new Set(dictionary).size !== dictionary.length ||
+          extra.some(id => !/^[A-Za-z0-9_-]+$/.test(id))) throw new Error('invalid compact history');
+      const binary = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
+      if (binary.length % 3) throw new Error('invalid compact history');
+      const rows = [];
+      for (let i = 0; i < binary.length; i += 3) {
+        const t = binary.charCodeAt(i), w = binary.charCodeAt(i+1), l = binary.charCodeAt(i+2);
+        if (!t || !w || w > dictionary.length || l > dictionary.length) throw new Error('invalid compact entry');
+        rows.push(['t_' + String(t).padStart(4, '0'), dictionary[w-1], l ? dictionary[l-1] : '']);
+      }
+      return rows;
     }
     function restoreSharedHistory() {
       if (!location.hash.startsWith('#history=')) return;
       try {
         const raw = decodeURIComponent(location.hash.slice(9));
-        if (!raw.startsWith('v1:') || raw.length > 1000000) throw new Error('invalid history');
         const tm = new Map(topics.map(t => [t.id, t]));
         const mm = new Map(members.map(m => [m.id, m]));
-        const restored = raw.slice(3).split('~').map(row => {
-          const [tid, winner, loser, ...extra] = row.split('.');
-          if (extra.length || !tm.has(tid) || !mm.has(winner) || (loser && !mm.has(loser))) throw new Error('invalid entry');
+        const restored = decodeHistoryRows(raw).map(row => {
+          const [tid, winner, loser, ...extra] = row;
+          if (extra.length || row.length !== 3 || !tm.has(tid) || !mm.has(winner) || (loser && !mm.has(loser))) throw new Error('invalid entry');
           return {topic: tm.get(tid).text, topicId: tid, member: mm.get(winner), opponent: mm.get(loser) || null};
         });
         gameHistory = restored;
