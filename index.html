@@ -1580,6 +1580,7 @@
     // === NAVIGATION ===
     function showScreen(screenId) {
       if (screenId === 'screen-title') {
+        if (location.hash.startsWith('#history=')) history.replaceState(null, '', location.pathname + location.search);
         resultNavigation = false;
         document.getElementById('clear-overlay').classList.remove('active');
       }
@@ -1669,6 +1670,7 @@
     let gameHistory = [];
 
     function startGame(mode) {
+      if (location.hash.startsWith('#history=')) history.replaceState(null, '', location.pathname + location.search);
       stopSpinTimers();
       resultNavigation = false;
       document.getElementById('clear-overlay').classList.remove('active');
@@ -1900,7 +1902,7 @@
       gameState.seenIds.add(gameState.leftMember.id);
       if (gameState.rightMember) gameState.seenIds.add(gameState.rightMember.id);
       gameState.selectedIds.add(winner.id);
-      gameHistory.push({ topic: gameState.currentTopic.text, member: winner });
+      gameHistory.push({ topic: gameState.currentTopic.text, topicId: gameState.currentTopic.id, member: winner, opponent: loser });
 
       if (loser) {
       const record = {
@@ -2044,7 +2046,7 @@
     }
 
     document.getElementById('stats-result-back').addEventListener('click', returnToResult);
-    document.getElementById('history-result-back').addEventListener('click', returnToResult);
+    document.getElementById('history-result-back').addEventListener('click', () => { if (resultNavigation) returnToResult(); else requestReturnToTitle(); });
 
     document.getElementById('btn-clear-stats').addEventListener('click', () => {
       document.getElementById('clear-overlay').classList.remove('active');
@@ -2054,6 +2056,33 @@
       void refreshRanking(true);
     });
 
+    // The fragment contains only public topic/member IDs, never local votes or images.
+    const SHARE_BASE = 'https://mateo-purple.github.io/Holo_choice/';
+    function historyShareURL(entries) {
+      const payload = entries.map(e => [e.topicId || topics.find(t => t.text === e.topic)?.id, e.member.id, e.opponent?.id || ''].join('.')).join('~');
+      return SHARE_BASE + '#history=v1:' + encodeURIComponent(payload);
+    }
+    function restoreSharedHistory() {
+      if (!location.hash.startsWith('#history=')) return;
+      try {
+        const raw = decodeURIComponent(location.hash.slice(9));
+        if (!raw.startsWith('v1:') || raw.length > 1000000) throw new Error('invalid history');
+        const tm = new Map(topics.map(t => [t.id, t]));
+        const mm = new Map(members.map(m => [m.id, m]));
+        const restored = raw.slice(3).split('~').map(row => {
+          const [tid, winner, loser, ...extra] = row.split('.');
+          if (extra.length || !tm.has(tid) || !mm.has(winner) || (loser && !mm.has(loser))) throw new Error('invalid entry');
+          return {topic: tm.get(tid).text, topicId: tid, member: mm.get(winner), opponent: mm.get(loser) || null};
+        });
+        gameHistory = restored;
+        hasActiveGame = false;
+        resultNavigation = false;
+        renderGameHistory();
+        showScreen('screen-history');
+      } catch (err) {
+        alert('共有履歴を読み込めませんでした。URLまたはサイトのバージョンを確認してください。');
+      }
+    }
     function renderGameHistory() {
       const list = document.getElementById('game-history-list');
       list.replaceChildren();
@@ -2095,7 +2124,7 @@
       const downloads = document.getElementById('history-share-downloads');
       const nativeButton = document.getElementById('history-native-share');
       const shareText = '究極のホロ二択';
-      const shareUrl = 'https://mateo-purple.github.io/Holo_choice/';
+      let shareUrl = SHARE_BASE;
       const xUrl = new URL('https://twitter.com/intent/tweet');
       xUrl.searchParams.set('text', shareText);
       xUrl.searchParams.set('url', shareUrl);
@@ -2203,7 +2232,7 @@
         });
         ctx.fillStyle = '#aaa';
         ctx.font = '16px sans-serif';
-        ctx.fillText(shareUrl, padding, y + 8);
+        ctx.fillText(SHARE_BASE, padding, y + 8);
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         if (!blob) throw new Error('image export failed');
         return new File([blob], 'holo-choice-history-' + page + '.png', {type:'image/png'});
@@ -2216,6 +2245,17 @@
         status.textContent = '画像を作成中…';
         const snapshot = gameHistory.slice();
         if (!snapshot.length) { status.textContent = '履歴がありません。'; return; }
+        shareUrl = historyShareURL(snapshot);
+        xUrl.searchParams.set('url', shareUrl);
+        document.getElementById('history-open-x').href = xUrl.href;
+        const copy = document.createElement('button');
+        copy.className = 'nav-btn';
+        copy.textContent = '履歴URLをコピー';
+        copy.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(shareUrl); copy.textContent = 'コピーしました'; }
+          catch { window.prompt('履歴URLをコピーしてください', shareUrl); }
+        });
+        downloads.appendChild(copy);
         try {
           if (document.fonts) await Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1500))]);
           const cache = new Map();
@@ -2492,6 +2532,7 @@
     // Init
     initPoolFilter();
     updateHudTotal();
+    restoreSharedHistory();
     if (onlineEnabled) {
       onlineStatus('全ユーザー共通ランキング（数分遅れて反映）');
       try { const cache = JSON.parse(localStorage.getItem(CACHE_KEY)); if (cache) { applyRanking(cache.rows); lastFetched = cache.at || 0; } } catch {}
