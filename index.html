@@ -1097,6 +1097,12 @@
     .fan-notice details { margin-top: 2px; }
     .fan-notice details[open] { max-width: 650px; text-align: left; }
     .fan-notice details p { margin: 5px 0; }
+    #consent-change { font-size: inherit; padding: 4px 8px; margin-top: 4px; }
+    #ranking-consent-overlay .modal-box { max-height: 90dvh; overflow: auto; }
+    .consent-options { display: flex; flex-direction: column; gap: 12px; text-align: left; margin: 20px auto; width: fit-content; }
+    .consent-options label { display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 36px; }
+    .consent-options input { accent-color: #fff; width: 20px; height: 20px; }
+    #consent-next:disabled { opacity: .45; cursor: not-allowed; }
     @media (max-width: 720px) {
       .fan-notice { font-size: .63rem; margin-top: 4px; line-height: 1.35; }
     }
@@ -1166,8 +1172,11 @@
         <div><a href="https://hololivepro.com/terms/" target="_blank" rel="noopener noreferrer">二次創作ガイドライン</a></div>
         <details>
           <summary>免責事項・プライバシー</summary>
-          <p>キャラクター・画像等の権利は各権利者に帰属します。ランキングは利用者の選択を集計したものであり、タレントの優劣を示すものではありません。権利者からの申し出には速やかに対応いたします。</p>
-          <p>選択履歴等は端末のブラウザに保存されます。オンラインランキングでは投票データが送信され、不正投票防止のためCloudflare TurnstileおよびIPアドレスによるアクセス制限を利用します。共有URLには選択履歴が含まれ、URLを知っている人が閲覧できます。</p>
+          <p>本サイト（本ゲーム）は非公式・非営利のファンゲームであり、カバー株式会社およびホロライブプロダクションとは一切関係ありません。 使用しているキャラクター・画像等の権利はすべて各権利者に帰属します。</p>
+          <p>ランキングは利用者の選択を集計したものであり、タレントの優劣を示すものではありません。 選択履歴等はご利用の端末のブラウザに保存されます。また、オンラインランキングでは投票データが送信されるほか、不正投票防止のためにCloudflare TurnstileおよびIPアドレスによるアクセス制限を利用しています。なお、共有URLには選択履歴が含まれるため、URLを知っている第三者も閲覧可能です。</p>
+          <p>投票データの送信は同意した場合のみ行います。同意しなくてもゲームや履歴共有、ランキングの閲覧は可能です。同意は下のボタンから変更できます。</p>
+          <p>権利者様からの申し出やお問い合わせには速やかに対応いたします。 ご連絡先：X（旧Twitter） <a href="https://x.com/Mrmuscleking" target="_blank" rel="noopener noreferrer">@Mrmuscleking</a></p>
+          <button class="nav-btn" id="consent-change" type="button">ランキング集計への同意を変更</button>
           <p><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Cloudflareプライバシーポリシー</a></p>
         </details>
       </aside>
@@ -1300,7 +1309,7 @@
       <h3 style="color:var(--accent); margin-top:0;">タイトル画面に戻りますか？</h3>
       <p style="line-height:1.7; font-size:1.05rem;">
         タイトル画面に戻ると、現在のモードの進行経過は消えます。<br>
-        <span style="color:var(--ok);">（※これまでの選択記録はランキングに反映されています）</span>
+        <span style="color:var(--ok);">（※同意している場合、これまでの選択記録はランキング集計の対象になります）</span>
       </p>
       <div style="display:flex; gap:12px; justify-content:center; margin-top:18px; flex-wrap:wrap;">
         <button class="nav-btn" id="btn-confirm-to-title" style="border-color:var(--danger); color:var(--danger);">タイトルへ戻る（経過を消す）</button>
@@ -1318,6 +1327,19 @@
         <button class="nav-btn" id="btn-clear-history">履歴を見る</button>
         <button class="nav-btn" id="btn-clear-stats">みんなの選択を見る</button>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="ranking-consent-overlay" role="dialog" aria-modal="true" aria-labelledby="consent-heading" aria-describedby="consent-description">
+    <div class="ut-box modal-box">
+      <h2 id="consent-heading" style="color:var(--accent); margin-top:0;">ランキング集計について</h2>
+      <p id="consent-description" style="line-height:1.7;">ゲーム内で選択したデータ（お題・選んだホロメン・対戦相手）を集計し、オンラインランキングに反映してもよろしいですか？</p>
+      <p>※同意しなくても問題なく遊べます。</p>
+      <div class="consent-options">
+        <label><input type="checkbox" id="consent-yes"> 同意する</label>
+        <label><input type="checkbox" id="consent-no"> 同意しない</label>
+      </div>
+      <button type="button" class="nav-btn" id="consent-next" disabled>進む ▶</button>
     </div>
   </div>
 
@@ -1394,18 +1416,43 @@
     const QUEUE_PREFIX = 'holo_choice_online_v1_batch_';
     const CACHE_KEY = 'holo_choice_online_v1_ranking';
     const BATCH_MAX = 10;
+    const CONSENT_KEY = 'holo_choice_ranking_consent_v1';
+    let sessionConsent = null, consentStorageFailed = false;
     const VOTE_PREFIX = 'holo_choice_online_v1_vote_';
     let voteCount = 0, sending = false, sendAgain = false, refreshing = null, globalRows = null, lastFetched = 0;
     function onlineStatus(message) {
       document.getElementById('online-status').textContent = message;
     }
     let retryTimer = null, retryDelay = 60000;
+    function rankingConsent() {
+      if (consentStorageFailed) return sessionConsent;
+      try {
+        const value = localStorage.getItem(CONSENT_KEY);
+        return value === 'yes' || value === 'no' ? value : null;
+      } catch { return sessionConsent; }
+    }
+    function canSendVotes() { return onlineEnabled && rankingConsent() === 'yes'; }
+    function discardPendingVotes() {
+      if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+      voteCount = 0;
+      try {
+        Object.keys(localStorage).filter(k => k.startsWith(QUEUE_PREFIX) || k.startsWith(VOTE_PREFIX)).forEach(k => localStorage.removeItem(k));
+      } catch (err) { console.warn(err); }
+    }
+    function saveRankingConsent(value) {
+      const previous = rankingConsent();
+      // Never upload legacy votes made before consent, or keep votes after refusal.
+      if (previous !== 'yes' || value === 'no') discardPendingVotes();
+      sessionConsent = value;
+      try { localStorage.setItem(CONSENT_KEY, value); consentStorageFailed = false; }
+      catch { consentStorageFailed = true; }
+    }
     function hasPendingVotes() {
       try { return Object.keys(localStorage).some(k => k.startsWith(QUEUE_PREFIX) || k.startsWith(VOTE_PREFIX)); }
       catch { return false; }
     }
     function scheduleVoteRetry() {
-      if (retryTimer !== null || !hasPendingVotes()) return;
+      if (!canSendVotes() || retryTimer !== null || !hasPendingVotes()) return;
       retryTimer = setTimeout(() => {
         retryTimer = null;
         if (document.visibilityState === 'visible' && navigator.onLine !== false) void flushVotes();
@@ -1414,7 +1461,7 @@
       retryDelay = Math.min(retryDelay * 2, 300000);
     }
     function queueVote(record) {
-      if (!onlineEnabled) return;
+      if (!canSendVotes()) return;
       try {
         const id = crypto.randomUUID();
         const vote = [record.topicId, record.winnerId, record.loserId];
@@ -1482,7 +1529,7 @@
       });
     }
     async function flushVotes() {
-      if (!onlineEnabled || !hasPendingVotes()) return;
+      if (!canSendVotes() || !hasPendingVotes()) return;
       if (navigator.onLine === false) { scheduleVoteRetry(); return; }
       // Freeze current batch synchronously before any network request.
       voteCount = 0;
@@ -1494,10 +1541,13 @@
           sendAgain = false;
           // Cross-tab mutual exclusion when supported. Other live tabs' batches are only sent once frozen below.
           const run = async () => {
+            if (!canSendVotes()) return;
             if (navigator.locks) freezePendingVotes();
             const batches = pendingBatches();
             for (const batch of batches) {
+              if (!canSendVotes()) return;
               const token = await challenge();
+              if (!canSendVotes() || !localStorage.getItem(QUEUE_PREFIX + batch.id)) return;
               const res = await fetch(apiBase + '/votes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id:batch.id, votes:batch.votes, token}), signal: AbortSignal.timeout(20000) });
               if (!res.ok) {
                 const detail = await res.json().catch(() => ({}));
@@ -1686,7 +1736,42 @@
 
     let gameHistory = [];
 
+    const consentOverlay = document.getElementById('ranking-consent-overlay');
+    const consentYes = document.getElementById('consent-yes');
+    const consentNo = document.getElementById('consent-no');
+    const consentNext = document.getElementById('consent-next');
+    let pendingConsentMode = null, consentPreviousFocus = null;
+    function updateConsentNext() { consentNext.disabled = consentYes.checked === consentNo.checked; }
+    consentYes.addEventListener('change', () => { if (consentYes.checked) consentNo.checked = false; updateConsentNext(); });
+    consentNo.addEventListener('change', () => { if (consentNo.checked) consentYes.checked = false; updateConsentNext(); });
+    function openRankingConsent(mode = null) {
+      pendingConsentMode = mode;
+      consentPreviousFocus = document.activeElement;
+      const current = rankingConsent();
+      consentYes.checked = current === 'yes';
+      consentNo.checked = current === 'no';
+      updateConsentNext();
+      consentOverlay.classList.add('active');
+      document.querySelector('header').inert = true;
+      document.querySelector('main').inert = true;
+      consentYes.focus();
+    }
+    consentNext.addEventListener('click', () => {
+      if (consentYes.checked === consentNo.checked) return;
+      saveRankingConsent(consentYes.checked ? 'yes' : 'no');
+      const mode = pendingConsentMode;
+      pendingConsentMode = null;
+      consentOverlay.classList.remove('active');
+      document.querySelector('header').inert = false;
+      document.querySelector('main').inert = false;
+      if (mode) startGame(mode); else consentPreviousFocus?.focus();
+    });
+    document.getElementById('consent-change').addEventListener('click', () => openRankingConsent());
+    window.addEventListener('storage', e => {
+      if (e.key === CONSENT_KEY && e.newValue !== 'yes') discardPendingVotes();
+    });
     function startGame(mode) {
+      if (rankingConsent() === null) { openRankingConsent(mode); return; }
       if (location.hash.startsWith('#history=')) history.replaceState(null, '', location.pathname + location.search);
       stopSpinTimers();
       resultNavigation = false;
@@ -2017,6 +2102,7 @@
     });
 
     document.addEventListener('keydown', (e) => {
+      if (consentOverlay.classList.contains('active')) return;
       if (document.getElementById('remaining-overlay').classList.contains('active')) {
         if (e.code === 'Escape') {
           e.preventDefault();
@@ -2424,6 +2510,7 @@
     initPoolFilter();
     updateHudTotal();
     restoreSharedHistory();
+    if (rankingConsent() !== 'yes') discardPendingVotes();
     if (onlineEnabled) {
       onlineStatus('全ユーザー共通ランキング（数分遅れて反映）');
       try { const cache = JSON.parse(localStorage.getItem(CACHE_KEY)); if (cache) { applyRanking(cache.rows); lastFetched = cache.at || 0; } } catch {}
